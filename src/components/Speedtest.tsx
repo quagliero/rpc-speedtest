@@ -5,10 +5,10 @@ import {
   useSendTransaction,
   useWaitForTransaction,
 } from "wagmi";
-import { parseEther } from "ethers/lib/utils.js";
+import { formatEther, parseEther } from "ethers/lib/utils.js";
 
-const rpcURL1 = "https://rpc.ankr.com/eth_goerli";
-const rpcURL2 = "https://eth-goerli.public.blastapi.io";
+const rpcURL1 = "https://eth-goerli.public.blastapi.io";
+const rpcURL2 = "https://rpc.ankr.com/eth_goerli";
 
 const provider1 = new ethers.providers.JsonRpcProvider(rpcURL1);
 const provider2 = new ethers.providers.JsonRpcProvider(rpcURL2);
@@ -25,7 +25,8 @@ const createNewWallet = async (wallet: ethers.Wallet, amount: BigNumber) => {
   });
 
   // Get the current gas price
-  const gasPrice = await wallet.getGasPrice();
+  const baseGasPrice = await wallet.getGasPrice();
+  const gasPrice = baseGasPrice.mul(110).div(100); // add 10%
 
   // Calculate the gas fee
   const gasFee = gasLimit.mul(gasPrice);
@@ -38,38 +39,38 @@ const createNewWallet = async (wallet: ethers.Wallet, amount: BigNumber) => {
   };
 
   const txResponse = await wallet.sendTransaction(tx);
+  console.log(
+    `Sending ${formatEther(amount.sub(gasFee))} to ${
+      randomWallet.address
+    } in tx ${txResponse.hash}`
+  );
   await txResponse.wait();
-
+  console.log(`Sent`);
   return randomWallet;
 };
 
 const sendSelfTransactions = async (
   wallet: ethers.Wallet,
   provider: ethers.providers.JsonRpcProvider,
-  onResult: (result: string) => void
+  onResult: (result: string) => void,
+  i: number
 ) => {
-  for (let i = 0; i < 10; i++) {
-    const tx = {
-      to: wallet.address,
-      value: 0,
-    };
+  const tx = {
+    to: wallet.address,
+    value: 0,
+  };
 
-    const txResponse = await wallet.sendTransaction(tx);
-    const txReceipt = await provider.waitForTransaction(txResponse.hash);
-    const block = await provider.getBlockWithTransactions(
-      txReceipt.blockNumber
-    );
-    const index = block.transactions.findIndex(
-      (x) => x.hash === txResponse.hash
-    );
-    const result = `Transaction ${i + 1} from ${
-      wallet.address
-    } was included in block ${txReceipt.blockNumber} with order ${index + 1}`;
-    console.log(result);
-    onResult(result);
+  const txResponse = await wallet.sendTransaction(tx);
+  const txReceipt = await provider.waitForTransaction(txResponse.hash);
+  const block = await provider.getBlockWithTransactions(txReceipt.blockNumber);
+  const index = block.transactions.findIndex((x) => x.hash === txResponse.hash);
+  const result = `Transaction ${i + 1} from ${
+    wallet.address
+  } was included in block ${txReceipt.blockNumber} with order ${index + 1}`;
+  console.log(result);
+  onResult(result);
 
-    await new Promise((resolve) => setTimeout(resolve, 60 * 1000)); // Wait 1 minute
-  }
+  return result;
 };
 
 const Speedtest: React.FC = () => {
@@ -101,7 +102,7 @@ const Speedtest: React.FC = () => {
   const { data, sendTransaction } = useSendTransaction(config);
 
   // the status of the send eth tx
-  const { isSuccess } = useWaitForTransaction({
+  const { isSuccess, isLoading } = useWaitForTransaction({
     hash: data?.hash,
   });
 
@@ -140,18 +141,27 @@ const Speedtest: React.FC = () => {
           setResults((prevResults) => [...prevResults, result]);
         };
 
-        await Promise.all([
-          sendSelfTransactions(
-            newWallet1.connect(provider1),
-            provider1,
-            onResult
-          ),
-          sendSelfTransactions(
-            newWallet2.connect(provider2),
-            provider2,
-            onResult
-          ),
-        ]);
+        for (let i = 0; i < 10; i++) {
+          await Promise.all([
+            sendSelfTransactions(
+              newWallet1.connect(provider1),
+              provider1,
+              onResult,
+              i
+            ),
+            sendSelfTransactions(
+              newWallet2.connect(provider2),
+              provider2,
+              onResult,
+              i
+            ),
+          ]);
+
+          if (i < 9) {
+            // Wait for 1 minute before starting the next iteration, but not after the last one
+            await new Promise((resolve) => setTimeout(resolve, 60 * 1000));
+          }
+        }
       })();
     }
   }, [isSuccess, initialWallet]);
@@ -178,11 +188,12 @@ const Speedtest: React.FC = () => {
       <button onClick={handleStartTest} disabled={!initialWallet}>
         Start Speed Test
       </button>
-      {newWallet1 && newWallet2 && (
+      {isLoading && <p>{"Sending ETH"}</p>}
+      {(newWallet1 || newWallet2) && (
         <div>
           <p>New wallets created:</p>
-          <p>Wallet 1: {newWallet1.address}</p>
-          <p>Wallet 2: {newWallet2.address}</p>
+          {newWallet1 && <p>Wallet 1: {newWallet1.address}</p>}
+          {newWallet2 && <p>Wallet 2: {newWallet2.address}</p>}
         </div>
       )}
       {results.length > 0 && (
