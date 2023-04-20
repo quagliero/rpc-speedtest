@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BigNumber, ethers } from "ethers";
+import { BigNumber, Wallet, ethers } from "ethers";
 import {
   usePrepareSendTransaction,
   useSendTransaction,
@@ -7,13 +7,15 @@ import {
 } from "wagmi";
 import { formatEther, parseEther } from "ethers/lib/utils.js";
 
-const rpcURL1 = "https://eth-goerli.public.blastapi.io";
-const rpcURL2 = "https://rpc.ankr.com/eth_goerli";
+const rpcURL = "https://eth.llamarpc.com";
+const aggregatorURL = process.env.NEXT_PUBLIC_AGGREGATOR_URL;
 
-const provider1 = new ethers.providers.JsonRpcProvider(rpcURL1);
-const provider2 = new ethers.providers.JsonRpcProvider(rpcURL2);
+const rpcProvider = new ethers.providers.JsonRpcProvider(rpcURL);
+const aggregatorProvider = new ethers.providers.JsonRpcProvider(aggregatorURL);
 
-const sendAmount = parseEther("0.025");
+const sendAmount = parseEther("0.0083");
+
+const LOOP_AMOUNT = 2;
 
 const createNewWallet = async (wallet: ethers.Wallet, amount: BigNumber) => {
   const randomWallet = ethers.Wallet.createRandom();
@@ -51,22 +53,36 @@ const createNewWallet = async (wallet: ethers.Wallet, amount: BigNumber) => {
 
 const sendSelfTransactions = async (
   wallet: ethers.Wallet,
-  provider: ethers.providers.JsonRpcProvider,
+  type: "rpc" | "aggregator",
   onResult: (result: string) => void,
   i: number
 ) => {
   const tx = {
     to: wallet.address,
+    from: wallet.address,
     value: 0,
   };
 
-  const txResponse = await wallet.sendTransaction(tx);
-  const txReceipt = await provider.waitForTransaction(txResponse.hash);
-  const block = await provider.getBlockWithTransactions(txReceipt.blockNumber);
-  const index = block.transactions.findIndex((x) => x.hash === txResponse.hash);
+  const txRequest = await wallet.connect(rpcProvider).populateTransaction(tx);
+  const signedTx = await wallet.signTransaction(txRequest);
+  // use RPC or Aggregator depending on type
+  const provider = type === "rpc" ? rpcProvider : aggregatorProvider;
+  const txHash = await provider.send("eth_sendRawTransaction", [signedTx]);
+  console.log(
+    `Transaction ${i + 1} from ${wallet.address}: ${txHash} (${type})`
+  );
+
+  const txReceipt = await rpcProvider.waitForTransaction(txHash);
+  const block = await rpcProvider.getBlockWithTransactions(
+    txReceipt.blockNumber
+  );
+
+  const index = block.transactions.findIndex((x) => x.hash === txHash);
   const result = `Transaction ${i + 1} from ${
     wallet.address
-  } was included in block ${txReceipt.blockNumber} with order ${index + 1}`;
+  } was included in block ${txReceipt.blockNumber} with order ${
+    index + 1
+  } (${type})`;
   console.log(result);
   onResult(result);
 
@@ -79,7 +95,7 @@ const Speedtest: React.FC = () => {
     () =>
       new ethers.Wallet(
         process.env.NEXT_PUBLIC_PRIVATE_KEY as string,
-        provider1
+        rpcProvider
       ),
     []
   );
@@ -122,7 +138,11 @@ const Speedtest: React.FC = () => {
           sendAmount.div(2)
         );
         setNewWallet1(newWallet1);
-        console.log("New wallet created:", newWallet1.address);
+        console.log(
+          "New wallet created:",
+          newWallet1.address,
+          newWallet1.privateKey
+        );
 
         console.log("Creating new wallet 2");
         const newWallet2 = await createNewWallet(
@@ -132,8 +152,8 @@ const Speedtest: React.FC = () => {
         setNewWallet2(newWallet2);
         console.log(
           "New wallet 2 created:",
-          newWallet1.address,
-          newWallet2.address
+          newWallet2.address,
+          newWallet2.privateKey
         );
 
         console.log("Sending self transactions...");
@@ -141,23 +161,26 @@ const Speedtest: React.FC = () => {
           setResults((prevResults) => [...prevResults, result]);
         };
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < LOOP_AMOUNT; i++) {
+          const isEven = i % 2 === 0 || i === 0;
+          // alternate the order the promises are dispatched
+          // so both get sent 'first' half of the time
           await Promise.all([
             sendSelfTransactions(
-              newWallet1.connect(provider1),
-              provider1,
+              newWallet1.connect(rpcProvider),
+              isEven ? "rpc" : "aggregator",
               onResult,
               i
             ),
             sendSelfTransactions(
-              newWallet2.connect(provider2),
-              provider2,
+              newWallet2.connect(rpcProvider),
+              isEven ? "aggregator" : "rpc",
               onResult,
               i
             ),
           ]);
 
-          if (i < 9) {
+          if (i < LOOP_AMOUNT - 1) {
             // Wait for 1 minute before starting the next iteration, but not after the last one
             await new Promise((resolve) => setTimeout(resolve, 60 * 1000));
           }
@@ -182,7 +205,8 @@ const Speedtest: React.FC = () => {
       {initialWallet && (
         <p>
           Speedtest wallet: {initialWallet.address} <br />
-          Starting the test sends 0.025 ETH to this address to begin.
+          Starting the test sends {formatEther(sendAmount)} ETH to this address
+          to begin.
         </p>
       )}
       <button onClick={handleStartTest} disabled={!initialWallet}>
