@@ -1,235 +1,195 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { BigNumber, Wallet, ethers } from "ethers";
 import {
+  useAccount,
+  useFeeData,
   usePrepareSendTransaction,
   useSendTransaction,
   useWaitForTransaction,
 } from "wagmi";
-import { formatEther, parseEther } from "ethers/lib/utils.js";
+import { formatEther } from "ethers/lib/utils.js";
+import { useSelfTransactions } from "../hooks/useSelfTransactions";
+import { useNewWallets } from "../hooks/useNewWallets";
+import { useCleanup } from "../hooks/useCleanup";
 
-const rpcURL = "https://eth.llamarpc.com";
+// Define an array of rpcUrls
 const aggregatorURL = process.env.NEXT_PUBLIC_AGGREGATOR_URL;
+const rpcUrls = [
+  "https://1rpc.io/eth",
+  "https://eth-mainnet-public.unifra.io",
+  // aggregatorURL,
+];
 
-const rpcProvider = new ethers.providers.JsonRpcProvider(rpcURL);
-const aggregatorProvider = new ethers.providers.JsonRpcProvider(aggregatorURL);
+// mumbai tests
+// const aggregatorURL = "https://polygon-mumbai.blockpi.network/v1/rpc/public";
+// const rpcUrls = [
+//   "https://polygon-testnet.public.blastapi.io",
+//   "https://rpc.ankr.com/polygon_mumbai",
+//   // aggregator URL
+//   aggregatorURL,
+// ];
 
-const sendAmount = parseEther("0.0083");
+// Use the first rpcUrl as the initial provider
+const initialProvider = new ethers.providers.JsonRpcProvider(rpcUrls[0]);
 
 const LOOP_AMOUNT = 2;
 
-const createNewWallet = async (wallet: ethers.Wallet, amount: BigNumber) => {
-  const randomWallet = ethers.Wallet.createRandom();
-
-  // Estimate gas required for the transaction
-  const gasLimit = await wallet.estimateGas({
-    to: randomWallet.address,
-    value: amount,
-  });
-
-  // Get the current gas price
-  const baseGasPrice = await wallet.getGasPrice();
-  const gasPrice = baseGasPrice.mul(110).div(100); // add 10%
-
-  // Calculate the gas fee
-  const gasFee = gasLimit.mul(gasPrice);
-
-  const tx = {
-    to: randomWallet.address,
-    value: amount.sub(gasFee), // Subtract gas fee from the amount
-    gasPrice,
-    gasLimit,
-  };
-
-  const txResponse = await wallet.sendTransaction(tx);
-  console.log(
-    `Sending ${formatEther(amount.sub(gasFee))} to ${
-      randomWallet.address
-    } in tx ${txResponse.hash}`
-  );
-  await txResponse.wait();
-  console.log(`Sent`);
-  return randomWallet;
-};
-
-const sendSelfTransactions = async (
-  wallet: ethers.Wallet,
-  type: "rpc" | "aggregator",
-  onResult: (result: string) => void,
-  i: number
-) => {
-  const tx = {
-    to: wallet.address,
-    from: wallet.address,
-    value: 0,
-  };
-
-  const txRequest = await wallet.connect(rpcProvider).populateTransaction(tx);
-  const signedTx = await wallet.signTransaction(txRequest);
-  // use RPC or Aggregator depending on type
-  const provider = type === "rpc" ? rpcProvider : aggregatorProvider;
-  const txHash = await provider.send("eth_sendRawTransaction", [signedTx]);
-  console.log(
-    `Transaction ${i + 1} from ${wallet.address}: ${txHash} (${type})`
-  );
-
-  const txReceipt = await rpcProvider.waitForTransaction(txHash);
-  const block = await rpcProvider.getBlockWithTransactions(
-    txReceipt.blockNumber
-  );
-
-  const index = block.transactions.findIndex((x) => x.hash === txHash);
-  const result = `Transaction ${i + 1} from ${
-    wallet.address
-  } was included in block ${txReceipt.blockNumber} with order ${
-    index + 1
-  } (${type})`;
-  console.log(result);
-  onResult(result);
-
-  return result;
-};
-
 const Speedtest: React.FC = () => {
+  const [complete, setComplete] = useState(false);
+  // user's account
+  const user = useAccount();
   // speedtest wallet
   const initialWallet = useMemo(
     () =>
-      new ethers.Wallet(
+      new Wallet(
         process.env.NEXT_PUBLIC_PRIVATE_KEY as string,
-        rpcProvider
+        initialProvider
       ),
     []
   );
+  const userWallet = user?.address;
 
-  // temp wallets that will be used to send the speedtest txs
-  const [newWallet1, setNewWallet1] = useState<ethers.Wallet | null>(null);
-  const [newWallet2, setNewWallet2] = useState<ethers.Wallet | null>(null);
-  const [results, setResults] = useState<string[]>([]);
+  const { data: feeData } = useFeeData({});
+
+  const gasPrice = feeData?.gasPrice || BigNumber.from(0);
+  // current gas price * 21k transfer gas limit
+  const transferPrice = gasPrice?.mul("21000");
+
+  // transfer price * the amount of times it needs to send (+ a 25% buffer)
+  const amount =
+    transferPrice?.mul(LOOP_AMOUNT).mul(125).div(100) || BigNumber.from(0);
+
+  // the seeding wallet needs the amount for all wallets to do their txs, plus the gas to actually seed the wallets
+  const totalAmount = amount
+    .mul(rpcUrls.length)
+    .add(transferPrice.mul(rpcUrls.length));
+
+  const { cleanup } = useCleanup({ initialProvider });
+  const { wallets, createWallets } = useNewWallets({
+    rpcUrls,
+    amount,
+    gasPrice,
+    initialWallet,
+  });
+  const { results, startSelfTransactions } = useSelfTransactions(
+    initialProvider,
+    rpcUrls,
+    LOOP_AMOUNT
+  );
 
   // the prepared tx to send the eth to the speedtest wallet
   const { config } = usePrepareSendTransaction({
     request: {
       to: initialWallet?.address as string,
-      value: sendAmount,
+      value: amount?.mul(rpcUrls.length), // send the amount * number of RPCs
     },
-    enabled: !!initialWallet?.address,
+    enabled: !!initialWallet?.address && !!gasPrice && !!amount,
   });
 
   // the send eth tx
   const { data, sendTransaction } = useSendTransaction(config);
 
   // the status of the send eth tx
-  const { isSuccess, isLoading } = useWaitForTransaction({
+  const { isLoading } = useWaitForTransaction({
     hash: data?.hash,
+    onSuccess: async () => {
+      const newWallets = await createWallets();
+      await startSelfTransactions(newWallets);
+      if (userWallet) {
+        await cleanup({ wallets: newWallets, returnWallet: userWallet });
+      }
+      setComplete(true);
+    },
   });
-
-  useEffect(() => {
-    // when the ETH has been sent to the speedtest wallet
-    if (isSuccess) {
-      (async () => {
-        console.log(
-          "Received",
-          ethers.utils.formatEther(sendAmount),
-          "ETH in the speedtest wallet."
-        );
-
-        console.log("Creating new wallet 1");
-        const newWallet1 = await createNewWallet(
-          initialWallet,
-          sendAmount.div(2)
-        );
-        setNewWallet1(newWallet1);
-        console.log(
-          "New wallet created:",
-          newWallet1.address,
-          newWallet1.privateKey
-        );
-
-        console.log("Creating new wallet 2");
-        const newWallet2 = await createNewWallet(
-          initialWallet,
-          sendAmount.div(2)
-        );
-        setNewWallet2(newWallet2);
-        console.log(
-          "New wallet 2 created:",
-          newWallet2.address,
-          newWallet2.privateKey
-        );
-
-        console.log("Sending self transactions...");
-        const onResult = (result: string) => {
-          setResults((prevResults) => [...prevResults, result]);
-        };
-
-        for (let i = 0; i < LOOP_AMOUNT; i++) {
-          const isEven = i % 2 === 0 || i === 0;
-          // alternate the order the promises are dispatched
-          // so both get sent 'first' half of the time
-          await Promise.all([
-            sendSelfTransactions(
-              newWallet1.connect(rpcProvider),
-              isEven ? "rpc" : "aggregator",
-              onResult,
-              i
-            ),
-            sendSelfTransactions(
-              newWallet2.connect(rpcProvider),
-              isEven ? "aggregator" : "rpc",
-              onResult,
-              i
-            ),
-          ]);
-
-          if (i < LOOP_AMOUNT - 1) {
-            // Wait for 1 minute before starting the next iteration, but not after the last one
-            await new Promise((resolve) => setTimeout(resolve, 60 * 1000));
-          }
-        }
-      })();
-    }
-  }, [isSuccess, initialWallet]);
-
-  const handleStartTest = async () => {
-    setResults([]);
-
-    if (!initialWallet) {
-      return;
-    }
-
-    sendTransaction?.();
-  };
 
   return (
     <div className="Speedtest">
-      <h1>Ethereum Speed Test</h1>
-      {initialWallet && (
-        <p>
-          Speedtest wallet: {initialWallet.address} <br />
-          Starting the test sends {formatEther(sendAmount)} ETH to this address
-          to begin.
-        </p>
-      )}
-      <button onClick={handleStartTest} disabled={!initialWallet}>
-        Start Speed Test
-      </button>
-      {isLoading && <p>{"Sending ETH"}</p>}
-      {(newWallet1 || newWallet2) && (
-        <div>
-          <p>New wallets created:</p>
-          {newWallet1 && <p>Wallet 1: {newWallet1.address}</p>}
-          {newWallet2 && <p>Wallet 2: {newWallet2.address}</p>}
-        </div>
+      <section className="mb-8">
+        <h2 className="text-lg font-bold">{"RPCs"}</h2>
+        <ul>
+          {rpcUrls.map((rpc) => (
+            <li key={rpc}>{rpc}</li>
+          ))}
+        </ul>
+      </section>
+      <section className="mb-8">
+        {initialWallet && (
+          <>
+            <p className="mb-6 text-sm">
+              Iterations: {LOOP_AMOUNT} <br />
+              <span className="text-sm">
+                Zero Transfer gas cost: {formatEther(transferPrice)} ETH
+                <br />
+                Transactions: {rpcUrls.length * LOOP_AMOUNT}
+              </span>
+            </p>
+            <p className="mb-8">
+              Starting the test sends {formatEther(totalAmount || "0")} ETH to
+              begin.
+            </p>
+          </>
+        )}
+        <button
+          className="bg-teal-500 text-white rounded-lg p-2"
+          onClick={() => sendTransaction?.()}
+          disabled={!initialWallet || isLoading}
+        >
+          {"Start Speed Test"}
+        </button>
+      </section>
+      {isLoading && <p className="animate-pulse">{"Sending ETH"}</p>}
+      {!!wallets.length && (
+        <section className="mb-8">
+          <div className="mb-4">
+            <h3 className="font-bold text-lg">New wallets created</h3>
+            <span className="text-sm">
+              {
+                "Leftover balances will be swept back to your wallet on completion"
+              }
+            </span>
+          </div>
+          {wallets.map((w, i) => (
+            <p key={w.address}>
+              Wallet {i + 1}: {w.address} ({w.privateKey})
+            </p>
+          ))}
+        </section>
       )}
       {results.length > 0 && (
-        <div>
-          <h2>Speed Test Results</h2>
-          <ul>
-            {results.map((result, index) => (
-              <li key={index}>{result}</li>
-            ))}
-          </ul>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold">Results</h2>
+
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="p-1 text-left">{"Iteration"}</th>
+                <th className="p-1 text-left">{"Transaction"}</th>
+                <th className="p-1 text-right">{"Block"}</th>
+                <th className="p-1 text-right">{"Order"}</th>
+                <th className="p-1 text-right">{"RPC"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((result) => {
+                return (
+                  <tr key={result.tx}>
+                    <td className="p-1">{result.iteration}</td>
+                    <td className="p-1">
+                      <span className="truncate block">{result.tx}</span>
+                    </td>
+                    <td className="p-1 text-right">{result.blockNumber}</td>
+                    <td className="p-1 text-right">{result.order}</td>
+                    <td className="p-1 text-right whitespace-nowrap">
+                      {result.label}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
+      {complete && <div className="mb-6">{"Speedtest complete!"}</div>}
     </div>
   );
 };

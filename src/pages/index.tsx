@@ -7,14 +7,16 @@ import Speedtest from "../components/Speedtest";
 function Page() {
   const { isConnected } = useAccount();
   return (
-    <>
-      <h1>wagmi + RainbowKit + Next.js</h1>
+    <div className="container mx-auto py-4">
+      <header className="flex justify-between mb-8">
+        <h1 className="text-2xl font-bold">RPC Speedtest</h1>
 
-      <ConnectButton />
-      {isConnected && <Account />}
-      <br />
-      <Speedtest />
-    </>
+        <ConnectButton />
+      </header>
+      <main>
+        <Speedtest />
+      </main>
+    </div>
   );
 }
 

@@ -1,25 +1,31 @@
-import { getDefaultWallets } from '@rainbow-me/rainbowkit'
-import { configureChains, createClient } from 'wagmi'
-import { goerli, mainnet } from 'wagmi/chains'
-import { publicProvider } from 'wagmi/providers/public'
+import { getDefaultWallets } from "@rainbow-me/rainbowkit";
+import { configureChains, createClient } from "wagmi";
+import { goerli, mainnet, polygonMumbai } from "wagmi/chains";
+import { publicProvider } from "wagmi/providers/public";
+import { jsonRpcProvider } from "wagmi/providers/jsonRpc";
 
 const { chains, provider, webSocketProvider } = configureChains(
-  [mainnet, ...(process.env.NODE_ENV === 'development' ? [goerli] : [])],
+  [mainnet, polygonMumbai],
   [
+    // jsonRpcProvider({
+    //   rpc: () => ({
+    //     http: "https://polygon-mumbai.blockpi.network/v1/rpc/public",
+    //   }),
+    // }),
     publicProvider(),
-  ],
-)
+  ]
+);
 
 const { connectors } = getDefaultWallets({
-  appName: 'My wagmi + RainbowKit App',
+  appName: "RPC Speedtest",
   chains,
-})
+});
 
 export const client = createClient({
   autoConnect: true,
   connectors,
   provider,
   webSocketProvider,
-})
+});
 
-export { chains }
+export { chains };
