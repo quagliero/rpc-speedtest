@@ -1,4 +1,5 @@
 import { BigNumber, Wallet, ethers } from "ethers";
+import { formatEther } from "ethers/lib/utils.js";
 import { useCallback, useState } from "react";
 
 const ticksToDate = (ticks: number) => {
@@ -60,21 +61,33 @@ export const useSelfTransactions = (
       );
       const index = block.transactions.findIndex((x) => x.hash === txHash);
 
-      const zeroMevReq = await fetch(`https://zeromev.org/zmblock/${block}`);
+      // fetch block data
+      const zeroMevReq = await fetch(
+        `https://api.zeromev.org/zmblock/${txReceipt.blockNumber}`
+      ).catch((e) => e);
       const zeroMevJson = (await zeroMevReq.json()) as {
         pop: [{ name: string; times: { t: number }[] }];
       };
-      const zeroMevData = zeroMevJson.pop?.filter(
-        (x: { times: { t: number }[] }) =>
-          x.times.length === block.transactions.length
-      );
-      const dates = zeroMevData.map((x) => {
-        return {
-          name: x.name,
-          date: ticksToDate(x.times[index].t),
-        };
-      });
-      // @TODO figure out what data
+      // get the matching block
+      const zeroMevData =
+        zeroMevJson.pop?.filter(
+          (x: { times: { t: number }[] }) =>
+            x.times.length === block.transactions.length
+        ) || [];
+
+      // pull out the first seen dates for different regions
+      const firstSeen = zeroMevData
+        .map((x) => {
+          const ticks = x.times[index]?.t;
+
+          if (ticks) {
+            return {
+              name: x.name,
+              date: ticksToDate(ticks),
+            };
+          }
+        })
+        .filter(Boolean) as Result["firstSeen"];
 
       const result = `Transaction ${i + 1} from ${
         wallet.address
@@ -91,7 +104,7 @@ export const useSelfTransactions = (
         blockNumber: txReceipt.blockNumber,
         order: index + 1,
         label,
-        firstSeen: dates,
+        firstSeen,
       });
 
       return result;
@@ -111,6 +124,7 @@ export const useSelfTransactions = (
         const promises = [];
         const gasPrice = await initialProvider.getGasPrice();
         console.log("Iteration ", i);
+        console.log("Gas", formatEther(gasPrice));
 
         for (let j = 0; j < providerUrls.length; j++) {
           const provider = new ethers.providers.JsonRpcProvider(

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { BigNumber, Wallet, ethers } from "ethers";
 import {
   useAccount,
@@ -12,10 +12,17 @@ import { useSelfTransactions } from "../hooks/useSelfTransactions";
 import { useNewWallets } from "../hooks/useNewWallets";
 import { useCleanup } from "../hooks/useCleanup";
 
+const ticksToDate = (ticks: number) => {
+  const epochTicks = BigInt("621355968000000000");
+  const unixMilliseconds = BigInt((BigInt(ticks) - epochTicks) / BigInt(10000));
+  const date = new Date(Number(unixMilliseconds));
+
+  return date;
+};
+
 // Define an array of rpcUrls
 const aggregatorURL = process.env.NEXT_PUBLIC_AGGREGATOR_URL;
 const rpcUrls = [
-  "https://1rpc.io/eth",
   "https://eth-mainnet-public.unifra.io",
   // aggregatorURL,
 ];
@@ -32,7 +39,7 @@ const rpcUrls = [
 // Use the first rpcUrl as the initial provider
 const initialProvider = new ethers.providers.JsonRpcProvider(rpcUrls[0]);
 
-const LOOP_AMOUNT = 2;
+const LOOP_AMOUNT = 1;
 
 const Speedtest: React.FC = () => {
   const [complete, setComplete] = useState(false);
@@ -60,9 +67,10 @@ const Speedtest: React.FC = () => {
     transferPrice?.mul(LOOP_AMOUNT).mul(125).div(100) || BigNumber.from(0);
 
   // the seeding wallet needs the amount for all wallets to do their txs, plus the gas to actually seed the wallets
+  // the +1 is the additional gas for the user transfer to the seed wallet
   const totalAmount = amount
     .mul(rpcUrls.length)
-    .add(transferPrice.mul(rpcUrls.length));
+    .add(transferPrice.mul(rpcUrls.length + 1));
 
   const { cleanup } = useCleanup({ initialProvider });
   const { wallets, createWallets } = useNewWallets({
@@ -101,6 +109,19 @@ const Speedtest: React.FC = () => {
       setComplete(true);
     },
   });
+
+  // Manual cleanup of privkeys
+  // useEffect(() => {
+  //   (async () => {
+  //     if (userWallet) {
+  //       const privkeys = [''];
+
+  //       const w = privkeys.map((x) => new Wallet(x, initialProvider));
+
+  //       await cleanup({ wallets: w, returnWallet: userWallet });
+  //     }
+  //   })();
+  // }, [userWallet]);
 
   return (
     <div className="Speedtest">
@@ -162,24 +183,35 @@ const Speedtest: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                <th className="p-1 text-left">{"Iteration"}</th>
-                <th className="p-1 text-left">{"Transaction"}</th>
-                <th className="p-1 text-right">{"Block"}</th>
-                <th className="p-1 text-right">{"Order"}</th>
-                <th className="p-1 text-right">{"RPC"}</th>
+                <th className="p-2 text-left">{"Iteration"}</th>
+                <th className="p-2 text-left">{"Transaction"}</th>
+                <th className="p-2 text-right">{"Block"}</th>
+                <th className="p-2 text-right">{"Order"}</th>
+                <th className="p-2 text-right">{"First seen"}</th>
+                <th className="p-2 text-right">{"RPC"}</th>
               </tr>
             </thead>
             <tbody>
               {results.map((result) => {
                 return (
                   <tr key={result.tx}>
-                    <td className="p-1">{result.iteration}</td>
-                    <td className="p-1">
+                    <td className="p-2">{result.iteration}</td>
+                    <td className="p-2">
                       <span className="truncate block">{result.tx}</span>
                     </td>
-                    <td className="p-1 text-right">{result.blockNumber}</td>
-                    <td className="p-1 text-right">{result.order}</td>
-                    <td className="p-1 text-right whitespace-nowrap">
+                    <td className="p-2 text-right">{result.blockNumber}</td>
+                    <td className="p-2 text-right">{result.order}</td>
+                    <td className="p-2 text-right">
+                      {result.firstSeen
+                        .sort((a, b) => a.date.getTime() - b.date.getTime())
+                        .map((fs, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{fs.name}</span>
+                            <span>{fs.date.getTime()}</span>
+                          </div>
+                        ))}
+                    </td>
+                    <td className="p-2 text-right whitespace-nowrap">
                       {result.label}
                     </td>
                   </tr>

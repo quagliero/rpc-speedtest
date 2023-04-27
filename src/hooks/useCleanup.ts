@@ -13,12 +13,15 @@ export const useCleanup = ({
     returnWallet: `0x${string}`;
   }) => {
     const allTransactions = [];
+    console.log("Cleaning up wallets");
     for (let i = 0; i < wallets.length; i++) {
+      console.log(`Wallet ${i + 1} of ${wallets.length}`);
       const wallet = wallets[i];
       const balance = await initialProvider.getBalance(wallet.address);
       const gasPrice = await wallet.connect(initialProvider).getGasPrice();
+      const value = balance.sub(gasPrice.mul("21000"));
 
-      if (balance.gt(0)) {
+      if (balance.gt(0) && value.gt(0)) {
         console.log(
           `Sweeping ${ethers.utils.formatEther(balance)} ETH from ${
             wallet.address
@@ -27,7 +30,7 @@ export const useCleanup = ({
         const tx = {
           to: returnWallet,
           from: wallet.address,
-          value: balance.sub(gasPrice.mul("21000")),
+          value,
           gasLimit: "21000",
           gasPrice: gasPrice,
         };
@@ -40,6 +43,8 @@ export const useCleanup = ({
         ]);
         console.log(`Swept to ${returnWallet} in tx ${txHash}`);
         allTransactions.push(txHash);
+      } else {
+        console.log(`Insufficient ETH to sweep`);
       }
     }
 
@@ -49,6 +54,8 @@ export const useCleanup = ({
         await initialProvider.waitForTransaction(txHash);
       })
     );
+
+    console.log("Cleanup done");
 
     return wallets;
   };
