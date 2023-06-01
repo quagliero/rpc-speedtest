@@ -2,29 +2,26 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BigNumber, Wallet, ethers } from "ethers";
 import {
   useAccount,
-  useFeeData,
+  useBlockNumber,
   usePrepareSendTransaction,
   useSendTransaction,
   useWaitForTransaction,
 } from "wagmi";
-import { formatEther } from "ethers/lib/utils.js";
+import { formatEther, parseUnits } from "ethers/lib/utils.js";
 import { useSelfTransactions } from "../hooks/useSelfTransactions";
 import { useNewWallets } from "../hooks/useNewWallets";
 import { useCleanup } from "../hooks/useCleanup";
 
-const ticksToDate = (ticks: number) => {
-  const epochTicks = BigInt("621355968000000000");
-  const unixMilliseconds = BigInt((BigInt(ticks) - epochTicks) / BigInt(10000));
-  const date = new Date(Number(unixMilliseconds));
-
-  return date;
-};
-
 // Define an array of rpcUrls
-const aggregatorURL = process.env.NEXT_PUBLIC_AGGREGATOR_URL;
+const aggregatorURL = process.env.NEXT_PUBLIC_AGGREGATOR_URL as string;
 const rpcUrls = [
-  "https://eth-mainnet-public.unifra.io",
-  // aggregatorURL,
+  "https://rpc.ankr.com/eth",
+  "https://eth.llamarpc.com/",
+  "https://api.securerpc.com/v1",
+  "https://rpc.flashbots.net/",
+  "https://api.edennetwork.io/v1/rocket",
+  "https://eth.rpc.blxrbdn.com/",
+  aggregatorURL,
 ];
 
 // mumbai tests
@@ -37,12 +34,18 @@ const rpcUrls = [
 // ];
 
 // Use the first rpcUrl as the initial provider
-const initialProvider = new ethers.providers.JsonRpcProvider(rpcUrls[0]);
+const initialProvider = new ethers.providers.JsonRpcProvider(
+  "https://rpc.ankr.com/eth"
+  // "https://rpc.ankr.com/polygon_mumbai"
+);
 
-const LOOP_AMOUNT = 1;
+const LOOP_AMOUNT = 4;
 
 const Speedtest: React.FC = () => {
   const [complete, setComplete] = useState(false);
+  const { data: blockNumber } = useBlockNumber();
+  const [feeData, setFeeData] = useState<ethers.providers.FeeData>();
+
   // user's account
   const user = useAccount();
   // speedtest wallet
@@ -56,9 +59,21 @@ const Speedtest: React.FC = () => {
   );
   const userWallet = user?.address;
 
-  const { data: feeData } = useFeeData({});
+  useEffect(() => {
+    (async () => {
+      if (initialWallet && blockNumber) {
+        const x = await initialWallet.getFeeData();
+        setFeeData(x);
+      }
+    })();
+  }, [initialWallet, blockNumber]);
 
-  const gasPrice = feeData?.gasPrice || BigNumber.from(0);
+  const maxPriorityFeePerGas =
+    feeData?.maxPriorityFeePerGas || parseUnits("1", "gwei");
+
+  const gasPrice =
+    feeData?.lastBaseFeePerGas?.add(maxPriorityFeePerGas) || BigNumber.from(0);
+
   // current gas price * 21k transfer gas limit
   const transferPrice = gasPrice?.mul("21000");
 
@@ -67,7 +82,6 @@ const Speedtest: React.FC = () => {
     transferPrice?.mul(LOOP_AMOUNT).mul(125).div(100) || BigNumber.from(0);
 
   // the seeding wallet needs the amount for all wallets to do their txs, plus the gas to actually seed the wallets
-  // the +1 is the additional gas for the user transfer to the seed wallet
   const totalAmount = amount
     .mul(rpcUrls.length)
     .add(transferPrice.mul(rpcUrls.length + 1));
@@ -77,10 +91,12 @@ const Speedtest: React.FC = () => {
     rpcUrls,
     amount,
     gasPrice,
+    maxPriorityFeePerGas,
     initialWallet,
   });
   const { results, startSelfTransactions } = useSelfTransactions(
     initialProvider,
+    initialWallet,
     rpcUrls,
     LOOP_AMOUNT
   );
@@ -89,7 +105,10 @@ const Speedtest: React.FC = () => {
   const { config } = usePrepareSendTransaction({
     request: {
       to: initialWallet?.address as string,
-      value: amount?.mul(rpcUrls.length), // send the amount * number of RPCs
+      value: totalAmount,
+      maxPriorityFeePerGas,
+      maxFeePerGas: gasPrice,
+      gasLimit: "21000",
     },
     enabled: !!initialWallet?.address && !!gasPrice && !!amount,
   });
@@ -139,9 +158,10 @@ const Speedtest: React.FC = () => {
             <p className="mb-6 text-sm">
               Iterations: {LOOP_AMOUNT} <br />
               <span className="text-sm">
-                Zero Transfer gas cost: {formatEther(transferPrice)} ETH
+                Zero Transfer gas cost: {formatEther(amount)} ETH
                 <br />
-                Transactions: {rpcUrls.length * LOOP_AMOUNT}
+                Transactions:{" "}
+                {rpcUrls.length * LOOP_AMOUNT + rpcUrls.length + 1}
               </span>
             </p>
             <p className="mb-8">

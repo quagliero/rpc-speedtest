@@ -9,7 +9,7 @@ const { chains, provider, webSocketProvider } = configureChains(
   [
     // jsonRpcProvider({
     //   rpc: () => ({
-    //     http: "https://polygon-mumbai.blockpi.network/v1/rpc/public",
+    //     http: "https://eth.llamarpc.com",
     //   }),
     // }),
     publicProvider(),

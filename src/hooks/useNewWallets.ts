@@ -2,19 +2,27 @@
 import { BigNumber, Wallet } from "ethers";
 import { useCallback, useState } from "react";
 
-const createNewWallet = async (
-  wallet: Wallet,
-  amount: BigNumber,
-  gasPrice: BigNumber,
-  i: number
-): Promise<Wallet> => {
+const createNewWallet = async ({
+  wallet,
+  amount,
+  gasPrice,
+  maxPriorityFeePerGas,
+  i,
+}: {
+  wallet: Wallet;
+  amount: BigNumber;
+  gasPrice: BigNumber;
+  maxPriorityFeePerGas: BigNumber;
+  i: number;
+}): Promise<Wallet> => {
   const randomWallet = Wallet.createRandom();
 
   const tx = {
     to: randomWallet.address,
     value: amount,
-    gasPrice,
     gasLimit: "21000",
+    maxPriorityFeePerGas,
+    maxFeePerGas: gasPrice,
   };
 
   const txResponse = await wallet.sendTransaction(tx);
@@ -32,11 +40,13 @@ export const useNewWallets = ({
   rpcUrls,
   amount,
   gasPrice,
+  maxPriorityFeePerGas,
   initialWallet,
 }: {
   rpcUrls: string[];
   amount: BigNumber;
   gasPrice: BigNumber;
+  maxPriorityFeePerGas: BigNumber;
   initialWallet: Wallet;
 }) => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -46,7 +56,13 @@ export const useNewWallets = ({
     const newWallets: Wallet[] = [];
 
     for (let i = 0; i < rpcUrls.length; i++) {
-      const wallet = await createNewWallet(initialWallet, amount, gasPrice, i);
+      const wallet = await createNewWallet({
+        wallet: initialWallet,
+        amount,
+        gasPrice,
+        maxPriorityFeePerGas,
+        i,
+      });
       console.log(`Funded wallet ${i + 1}:`, wallet.address, wallet.privateKey);
 
       setWallets((prevWallets) => [...prevWallets, wallet]);

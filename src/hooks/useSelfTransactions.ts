@@ -1,5 +1,5 @@
 import { BigNumber, Wallet, ethers } from "ethers";
-import { formatEther } from "ethers/lib/utils.js";
+import { formatEther, parseUnits } from "ethers/lib/utils.js";
 import { useCallback, useState } from "react";
 
 const ticksToDate = (ticks: number) => {
@@ -21,27 +21,38 @@ type Result = {
 };
 export const useSelfTransactions = (
   initialProvider: ethers.providers.JsonRpcProvider,
+  initialWallet: Wallet,
   providerUrls: string[],
   loopAmount: number
 ) => {
   const [results, setResults] = useState<Result[]>([]);
 
   const sendSelfTransactions = useCallback(
-    async (
-      wallet: Wallet,
-      gasPrice: BigNumber,
-      provider: ethers.providers.JsonRpcProvider,
-      onResult: (args: Result) => void,
-      i: number,
-      label: string
-    ) => {
+    async ({
+      wallet,
+      gasPrice,
+      maxFee,
+      provider,
+      onResult,
+      i,
+      label,
+    }: {
+      wallet: Wallet;
+      gasPrice?: BigNumber;
+      maxFee: BigNumber;
+      provider: ethers.providers.JsonRpcProvider;
+      onResult: (args: Result) => void;
+      i: number;
+      label: string;
+    }) => {
       console.log(`Building transaction ${i + 1} from ${wallet.address}`);
       const tx = {
         to: wallet.address,
         from: wallet.address,
-        value: "0",
+        value: 0,
         gasLimit: "21000",
-        gasPrice,
+        maxPriorityFeePerGas: maxFee,
+        maxFeePerGas: gasPrice,
       };
 
       const txRequest = await wallet
@@ -122,9 +133,16 @@ export const useSelfTransactions = (
 
       for (let i = 0; i < loopAmount; i++) {
         const promises = [];
-        const gasPrice = await initialProvider.getGasPrice();
-        console.log("Iteration ", i);
-        console.log("Gas", formatEther(gasPrice));
+        const { lastBaseFeePerGas, maxPriorityFeePerGas } =
+          await initialWallet.getFeeData();
+        const maxFee = maxPriorityFeePerGas || parseUnits("1", "gwei");
+        const gasPrice = lastBaseFeePerGas?.add(maxFee) || undefined;
+
+        console.log("Iteration ", i + 1);
+        console.log("Gas", {
+          maxFeePerGas: gasPrice ? formatEther(gasPrice) : null,
+          maxPriorityFeePerGas: formatEther(maxFee),
+        });
 
         for (let j = 0; j < providerUrls.length; j++) {
           const provider = new ethers.providers.JsonRpcProvider(
@@ -133,14 +151,15 @@ export const useSelfTransactions = (
           const isEven = i % 2 === 0 || i === 0;
 
           promises.push(
-            sendSelfTransactions(
-              wallets[j].connect(initialProvider),
+            sendSelfTransactions({
+              wallet: wallets[j].connect(initialProvider),
               gasPrice,
+              maxFee,
               provider,
               onResult,
               i,
-              providerUrls[j]
-            )
+              label: providerUrls[j],
+            })
           );
 
           // alternate the order the promises are dispatched
@@ -153,12 +172,18 @@ export const useSelfTransactions = (
         await Promise.all(promises);
 
         if (i < loopAmount - 1) {
-          // Wait for 1 minute before starting the next iteration, but not after the last one
-          await new Promise((resolve) => setTimeout(resolve, 60 * 1000));
+          // Wait for 13 seconds before starting the next iteration, but not after the last one
+          await new Promise((resolve) => setTimeout(resolve, 13 * 1000));
         }
       }
     },
-    [providerUrls, loopAmount, sendSelfTransactions, initialProvider]
+    [
+      providerUrls,
+      loopAmount,
+      sendSelfTransactions,
+      initialProvider,
+      initialWallet,
+    ]
   );
 
   return {
