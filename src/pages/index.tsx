@@ -1,19 +1,29 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
-
-import { Account } from "../components";
 import Speedtest from "../components/Speedtest";
 
 function Page() {
-  const { isConnected } = useAccount();
   return (
-    <div className="container mx-auto py-4">
-      <header className="flex justify-between mb-8">
-        <h1 className="text-2xl font-bold">RPC Speedtest</h1>
+    <div className="flex flex-col min-h-screen">
+      <header className="container mx-auto max-w-7xl px-6">
+        <nav
+          className="flex items-center justify-between py-6"
+          aria-label="Global"
+        >
+          <div className="flex lg:flex-1">
+            <a href="#" className="-m-1.5 p-1.5 flex items-center">
+              <span className="text-2xl mr-2">{"🚀"}</span>
+              <span className="font-bold text-xl text-indigo-600">
+                RPC SpeedTest
+              </span>
+            </a>
+          </div>
 
-        <ConnectButton />
+          <div className="flex lg:flex-1 lg:justify-end">
+            <ConnectButton />
+          </div>
+        </nav>
       </header>
-      <main>
+      <main className="flex-1 flex flex-col">
         <Speedtest />
       </main>
     </div>

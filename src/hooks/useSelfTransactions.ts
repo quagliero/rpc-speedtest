@@ -1,6 +1,7 @@
 import { BigNumber, Wallet, ethers } from "ethers";
 import { formatEther, parseUnits } from "ethers/lib/utils.js";
 import { useCallback, useState } from "react";
+import { Result } from "../types";
 
 const ticksToDate = (ticks: number) => {
   const epochTicks = BigInt("621355968000000000");
@@ -10,21 +11,19 @@ const ticksToDate = (ticks: number) => {
   return date;
 };
 
-type Result = {
-  iteration: number;
-  wallet: string;
-  blockNumber: number;
-  order: number;
-  tx: string;
-  label: string;
-  firstSeen: { name: string; date: Date }[];
-};
-export const useSelfTransactions = (
-  initialProvider: ethers.providers.JsonRpcProvider,
-  initialWallet: Wallet,
-  providerUrls: string[],
-  loopAmount: number
-) => {
+export const useSelfTransactions = ({
+  initialProvider,
+  initialWallet,
+  rpcUrls,
+  loops,
+  delay = 13,
+}: {
+  initialProvider: ethers.providers.JsonRpcProvider;
+  initialWallet: Wallet;
+  rpcUrls: string[];
+  loops: number;
+  delay: number;
+}) => {
   const [results, setResults] = useState<Result[]>([]);
 
   const sendSelfTransactions = useCallback(
@@ -131,7 +130,7 @@ export const useSelfTransactions = (
 
       console.log("Beginning transactions");
 
-      for (let i = 0; i < loopAmount; i++) {
+      for (let i = 0; i < loops; i++) {
         const promises = [];
         const { lastBaseFeePerGas, maxPriorityFeePerGas } =
           await initialWallet.getFeeData();
@@ -144,10 +143,8 @@ export const useSelfTransactions = (
           maxPriorityFeePerGas: formatEther(maxFee),
         });
 
-        for (let j = 0; j < providerUrls.length; j++) {
-          const provider = new ethers.providers.JsonRpcProvider(
-            providerUrls[j]
-          );
+        for (let j = 0; j < rpcUrls.length; j++) {
+          const provider = new ethers.providers.JsonRpcProvider(rpcUrls[j]);
           const isEven = i % 2 === 0 || i === 0;
 
           promises.push(
@@ -158,7 +155,7 @@ export const useSelfTransactions = (
               provider,
               onResult,
               i,
-              label: providerUrls[j],
+              label: rpcUrls[j],
             })
           );
 
@@ -171,19 +168,13 @@ export const useSelfTransactions = (
 
         await Promise.all(promises);
 
-        if (i < loopAmount - 1) {
-          // Wait for 13 seconds before starting the next iteration, but not after the last one
-          await new Promise((resolve) => setTimeout(resolve, 13 * 1000));
+        if (i < loops - 1) {
+          // Wait for [delay] seconds before starting the next iteration, but not after the last one
+          await new Promise((resolve) => setTimeout(resolve, delay * 1000));
         }
       }
     },
-    [
-      providerUrls,
-      loopAmount,
-      sendSelfTransactions,
-      initialProvider,
-      initialWallet,
-    ]
+    [rpcUrls, loops, sendSelfTransactions, initialProvider, initialWallet]
   );
 
   return {
