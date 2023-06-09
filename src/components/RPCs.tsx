@@ -1,11 +1,9 @@
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { Chain } from "wagmi";
 
 const RPCs = ({
   urls,
   setUrls,
 }: {
-  chain: Chain;
   urls: string[];
   setUrls: Dispatch<SetStateAction<string[]>>;
 }) => {

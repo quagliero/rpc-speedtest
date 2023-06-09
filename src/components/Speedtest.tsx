@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { mainnet, useNetwork } from "wagmi";
 import ResultsTable from "./ResultsTable";
 import RPCs from "./RPCs";
@@ -25,7 +25,8 @@ const Speedtest: React.FC = () => {
   const [delay, setDelay] = useState(() => 13);
   const { chain: activeChain } = useNetwork();
   const chain = activeChain || mainnet;
-  const [rpcUrls, setRpcUrls] = useState(() => RPC_URLS[chain.id as 1 | 80001]);
+  const [rpcUrls, setRpcUrls] = useState(RPC_URLS[chain.id as 1 | 80001]);
+  const [rpcKey, setRpcKey] = useState(chain.id);
 
   const {
     initialWallet,
@@ -42,11 +43,17 @@ const Speedtest: React.FC = () => {
     rpcUrls,
   });
 
+  useEffect(() => {
+    setRpcUrls(RPC_URLS[chain.id as 1 | 80001]);
+    // ensure RPCs list is refreshed
+    setRpcKey(chain.id);
+  }, [chain.id]);
+
   return (
     <div className="Speedtest mt-8 flex-1 flex flex-col">
       <div className="container mx-auto max-w-7xl grid grid-cols-2 gap-12 px-6">
         <section className="mb-8">
-          <RPCs chain={chain} urls={rpcUrls} setUrls={setRpcUrls} />
+          <RPCs key={rpcKey} urls={rpcUrls} setUrls={setRpcUrls} />
         </section>
         <section className="mb-8">
           <Details

@@ -2,7 +2,6 @@ import { BigNumber, Wallet } from "ethers";
 import { formatEther } from "ethers/lib/utils.js";
 import { Dispatch, SetStateAction, useState } from "react";
 import { Chain } from "wagmi";
-import { ellipsis } from "../utils/ellipsis";
 
 const Details = ({
   rpcCount,
