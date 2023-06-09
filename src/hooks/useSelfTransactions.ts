@@ -145,8 +145,6 @@ export const useSelfTransactions = ({
 
         for (let j = 0; j < rpcUrls.length; j++) {
           const provider = new ethers.providers.JsonRpcProvider(rpcUrls[j]);
-          const isEven = i % 2 === 0 || i === 0;
-
           promises.push(
             sendSelfTransactions({
               wallet: wallets[j].connect(initialProvider),
@@ -158,12 +156,6 @@ export const useSelfTransactions = ({
               label: rpcUrls[j],
             })
           );
-
-          // alternate the order the promises are dispatched
-          // so both get sent 'first' half of the time
-          if (isEven) {
-            promises.reverse();
-          }
         }
 
         await Promise.all(promises);
@@ -174,7 +166,14 @@ export const useSelfTransactions = ({
         }
       }
     },
-    [rpcUrls, loops, sendSelfTransactions, initialProvider, initialWallet]
+    [
+      rpcUrls,
+      loops,
+      delay,
+      sendSelfTransactions,
+      initialProvider,
+      initialWallet,
+    ]
   );
 
   return {

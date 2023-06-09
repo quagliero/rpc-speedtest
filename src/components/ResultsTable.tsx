@@ -6,13 +6,12 @@ const ResultsTable = ({
   results,
   chain,
 }: {
-  results: Result[];
+  results?: Result[];
   chain: Chain;
 }) => {
   return (
     <>
-      <h2 className="text-xl font-bold">Results</h2>
-      <table className="min-w-full divide-y divide-gray-300">
+      <table className="min-w-full divide-y divide-gray-300 bg-white text-gray-800 rounded-lg overflow-hidden">
         <thead>
           <tr>
             <th
@@ -42,7 +41,7 @@ const ResultsTable = ({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
-          {results.map((result) => {
+          {results?.map((result) => {
             return (
               <tr key={result.tx}>
                 <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
@@ -52,7 +51,7 @@ const ResultsTable = ({
                   <a
                     title={result.tx}
                     className="text-underline hover:no-underline"
-                    href={`${chain?.blockExplorers?.default}/tx/${result.tx}`}
+                    href={`${chain?.blockExplorers?.default.url}/tx/${result.tx}`}
                     target="_blank"
                     rel="noreferrer nofollow"
                   >
@@ -62,7 +61,7 @@ const ResultsTable = ({
                 <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
                   <a
                     className="text-underline hover:no-underline"
-                    href={`${chain?.blockExplorers?.default}/block/${result.tx}`}
+                    href={`${chain?.blockExplorers?.default.url}/block/${result.tx}`}
                     target="_blank"
                     rel="noreferrer nofollow"
                   >

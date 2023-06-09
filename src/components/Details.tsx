@@ -1,6 +1,6 @@
 import { BigNumber, Wallet } from "ethers";
 import { formatEther } from "ethers/lib/utils.js";
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { Chain } from "wagmi";
 import { ellipsis } from "../utils/ellipsis";
 
@@ -14,6 +14,7 @@ const Details = ({
   transferCost,
   chain,
   initialWallet,
+  wallets,
 }: {
   chain: Chain;
   rpcCount: number;
@@ -24,7 +25,10 @@ const Details = ({
   totalCost: BigNumber;
   transferCost: BigNumber;
   initialWallet: Wallet;
+  wallets?: Wallet[];
 }) => {
+  const [showWallets, setShowWallets] = useState(true);
+
   return (
     <aside>
       <legend className="text-base font-semibold leading-6 text-gray-900">
@@ -111,23 +115,49 @@ const Details = ({
           </dd>
         </div>
         <div className={`p-2 text-gray-800`}>
-          <div className="flex items-start">
-            <dt className="flex-1 text-sm leading-6 font-medium whitespace-nowrap">
-              {"Test Wallet"}
-              <p className="text-gray-500 text-xs">
-                {/* {`Wallet that receives ${chain.nativeCurrency.symbol} to start test.`} */}
-              </p>
-            </dt>
-            <dd className="ml-3 text-right min-w-0 leading-none">
-              <span className="break-words text-sm">
-                {initialWallet.address}
-              </span>
-              <br />
-              <span className="text-xs text-right py-1 opacity-75 break-words">
-                🔐 {initialWallet.privateKey}
-              </span>
+          <dt className="min-w-0 flex-1 text-sm leading-6 font-medium flex justify-between">
+            {"Wallets"}
+            <button
+              onClick={() => setShowWallets((x) => !x)}
+              className="text-indigo-500 underline text-xs"
+            >
+              {`${showWallets ? "Hide" : "Show"} Wallets`}
+            </button>
+          </dt>
+          {showWallets && (
+            <dd className="text-xs">
+              <dl className="space-y-2">
+                <div className="flex items-end">
+                  <dt className="min-w-0 text-xs leading-6 font-medium text-gray-500 whitespace-nowrap">
+                    {"Genesis"}
+                  </dt>
+                  <dd className="flex-1 ml-3 text-right min-w-0 leading-none">
+                    <span className="break-words text-xs">
+                      {initialWallet.address}
+                    </span>
+                    <br />
+                    <span className="text-xs text-right py-1 opacity-75 break-words">
+                      {initialWallet.privateKey} 🔐
+                    </span>
+                  </dd>
+                </div>
+                {wallets?.map((w, i) => (
+                  <div className="flex items-center" key={w.address}>
+                    <dt className="min-w-0 text-xs leading-6 font-medium text-gray-500 whitespace-nowrap">
+                      {`SpeedTest ${i + 1}`}
+                    </dt>
+                    <dd className="flex-1 ml-3 text-right min-w-0 leading-none">
+                      <span className="break-words text-xs">{w.address}</span>
+                      <br />
+                      <span className="text-xs text-right py-1 opacity-75 break-words">
+                        {w.privateKey} 🔐
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </dd>
-          </div>
+          )}
         </div>
       </dl>
     </aside>

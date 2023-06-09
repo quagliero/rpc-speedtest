@@ -72,7 +72,7 @@ export const useNewWallets = ({
     console.log("Wallet creation completed");
 
     return newWallets;
-  }, [amount, gasPrice, initialWallet, rpcUrls]);
+  }, [amount, gasPrice, maxPriorityFeePerGas, initialWallet, rpcUrls]);
 
   return {
     wallets,

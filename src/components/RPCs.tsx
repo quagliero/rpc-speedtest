@@ -86,7 +86,7 @@ const RPCs = ({
                   name={`rpc-${rpc.url}`}
                   type="checkbox"
                   checked={selectedUrls.includes(rpc.url)}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 accent-indigo-600"
                   onChange={() => handleRpcChange(rpc.url)}
                 />
               </div>
