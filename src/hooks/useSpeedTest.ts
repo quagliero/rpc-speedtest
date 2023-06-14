@@ -53,7 +53,7 @@ const useSpeedTest = ({
     return new Wallet(randomWallet.privateKey, initialProvider);
   }, [initialProvider]);
 
-  const { cleanup } = useCleanup({ initialProvider });
+  const { cleanup } = useCleanup({ initialProvider, chain });
 
   const { maxPriorityFeePerGas, gasPrice } = useFeeData({
     initialWallet,
@@ -75,7 +75,7 @@ const useSpeedTest = ({
     .mul(rpcUrls.length)
     .add(transferPrice.mul(rpcUrls.length + 1));
 
-  const { wallets, createWallets } = useNewWallets({
+  const { wallets, createWallets, setWallets } = useNewWallets({
     rpcUrls,
     amount,
     gasPrice,
@@ -83,7 +83,7 @@ const useSpeedTest = ({
     initialWallet,
   });
 
-  const { results, startSelfTransactions } = useSelfTransactions({
+  const { results, startSelfTransactions, setResults } = useSelfTransactions({
     initialProvider,
     initialWallet,
     rpcUrls: rpcUrls.filter(Boolean),
@@ -122,6 +122,13 @@ const useSpeedTest = ({
     },
   });
 
+  // clear the speedtest
+  const reset = () => {
+    setWallets([]);
+    setResults([]);
+    setStatus("idle");
+  };
+
   // we start the test when the first tx is firing.
   useEffect(() => {
     if (isLoading) {
@@ -132,11 +139,15 @@ const useSpeedTest = ({
   return {
     initialWallet,
     status,
+    setStatus,
+    setResults,
+    setWallets,
     wallets,
     results,
     sendTransaction,
     totalAmount,
     transferPrice,
+    reset,
   };
 };
 

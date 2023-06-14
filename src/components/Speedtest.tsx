@@ -8,6 +8,8 @@ import useSpeedTest from "../hooks/useSpeedTest";
 import Spinner from "./Spinner";
 import { formatNumber } from "../utils/formatNumber";
 import { formatEther } from "ethers/lib/utils.js";
+import RankingsTable from "./RankingsTable";
+import { scrollToBottom } from "../utils/scrollToBottom";
 
 function getCurrentIteration(
   loopCount: number,
@@ -31,11 +33,12 @@ const Speedtest: React.FC = () => {
   const {
     initialWallet,
     results,
-    wallets,
+    reset,
+    sendTransaction,
     status,
     totalAmount,
     transferPrice,
-    sendTransaction,
+    wallets,
   } = useSpeedTest({
     chain,
     delay,
@@ -49,9 +52,16 @@ const Speedtest: React.FC = () => {
     setRpcKey(chain.id);
   }, [chain.id]);
 
+  useEffect(() => {
+    // any time new result comes in
+    if (!!results.length) {
+      scrollToBottom();
+    }
+  }, [results]);
+
   return (
     <div className="Speedtest mt-8 flex-1 flex flex-col">
-      <div className="container mx-auto max-w-7xl grid grid-cols-2 gap-12 px-6">
+      <div className="container mx-auto max-w-7xl grid sm:grid-cols-2 sm:gap-12 px-6">
         <section className="mb-8">
           <RPCs key={rpcKey} urls={rpcUrls} setUrls={setRpcUrls} />
         </section>
@@ -107,10 +117,13 @@ const Speedtest: React.FC = () => {
               <Spinner />
             </p>
           )}
-          {(status === "running" || results.length > 0) && (
-            <div className="mb-6 flex-1">
+          {(status === "running" ||
+            status === "success" ||
+            status === "cleaning") && (
+            <div className="mb-6 flex-1 space-y-6">
               <ResultsTable chain={chain} results={results} />
-              <p className="mt-6 w-full flex items-center justify-center text-xl">
+              <RankingsTable results={results} />
+              <p className="w-full flex items-center justify-center text-xl">
                 {status === "running" && (
                   <>
                     <span className="mr-4">
@@ -129,7 +142,25 @@ const Speedtest: React.FC = () => {
                     <Spinner />
                   </>
                 )}
-                {status === "success" && <span>{"Speedtest complete!"}</span>}
+                {status === "success" && (
+                  <span className="flex items-center space-x-4">
+                    <button
+                      onClick={() => reset()}
+                      className="flex-none text-sm font-medium ml-2 bg-white rounded-full px-3 py-1 text-indigo-600 hover:bg-indigo-100"
+                    >
+                      {"Clear Results"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        reset();
+                        sendTransaction?.();
+                      }}
+                      className="flex-none text-sm font-medium ml-2 bg-white rounded-full px-3 py-1 text-indigo-600 hover:bg-indigo-100"
+                    >
+                      {"Run Again"}
+                    </button>
+                  </span>
+                )}
               </p>
             </div>
           )}

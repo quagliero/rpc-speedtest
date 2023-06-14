@@ -2,6 +2,18 @@ import { Chain } from "wagmi";
 import { ellipsis } from "../utils/ellipsis";
 import { Result } from "../types";
 
+const resultSortFn = (a: Result, b: Result) => {
+  if (a.iteration !== b.iteration) {
+    return a.iteration - b.iteration;
+  }
+
+  if (a.blockNumber !== b.blockNumber) {
+    return a.blockNumber - b.blockNumber;
+  }
+
+  return a.order - b.order;
+};
+
 const ResultsTable = ({
   results,
   chain,
@@ -9,8 +21,15 @@ const ResultsTable = ({
   results?: Result[];
   chain: Chain;
 }) => {
+  if (!results?.length) {
+    return null;
+  }
+
+  const sortedResults = [...(results || [])].sort(resultSortFn);
+
   return (
-    <>
+    <div className="w-full">
+      <h2 className="font-bold text-lg mb-2">{"SpeedTest Results"}</h2>
       <table className="min-w-full divide-y divide-gray-300 bg-white text-gray-800 rounded-lg overflow-hidden">
         <thead>
           <tr>
@@ -41,9 +60,14 @@ const ResultsTable = ({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
-          {results?.map((result) => {
+          {sortedResults?.map((result) => {
             return (
-              <tr key={result.tx}>
+              <tr
+                key={result.tx}
+                className={
+                  result.iteration % 2 === 0 ? "bg-gray-100" : "bg-white"
+                }
+              >
                 <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
                   {result.iteration}
                 </td>
@@ -89,7 +113,7 @@ const ResultsTable = ({
           })}
         </tbody>
       </table>
-    </>
+    </div>
   );
 };
 

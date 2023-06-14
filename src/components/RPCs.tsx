@@ -31,7 +31,7 @@ const RPCs = ({
         return newUrls;
       }
 
-      return [...urls, url];
+      return [...urls, url.trim()];
     });
   };
 
@@ -59,12 +59,11 @@ const RPCs = ({
                       placeholder="e.g. https://some-rpc.com/"
                       onChange={(e) =>
                         setRpcUrls((rpcs) => {
-                          console.log(e);
                           return rpcs.map((rpc, j) => {
                             if (i === j) {
                               return {
                                 ...rpc,
-                                url: e.target.value,
+                                url: e.target.value.trim(),
                               };
                             }
 

@@ -76,6 +76,7 @@ export const useNewWallets = ({
 
   return {
     wallets,
+    setWallets,
     createWallets,
   };
 };

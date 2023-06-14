@@ -1,9 +1,12 @@
 import { Wallet, ethers } from "ethers";
+import { Chain } from "wagmi";
 
 export const useCleanup = ({
   initialProvider,
+  chain,
 }: {
   initialProvider: ethers.providers.JsonRpcProvider;
+  chain: Chain;
 }) => {
   const cleanup = async ({
     wallets,
@@ -23,9 +26,9 @@ export const useCleanup = ({
 
       if (balance.gt(0) && value.gt(0)) {
         console.log(
-          `Sweeping ${ethers.utils.formatEther(balance)} ETH from ${
-            wallet.address
-          }`
+          `Sweeping ${ethers.utils.formatEther(balance)} ${
+            chain.nativeCurrency.symbol
+          } from ${wallet.address}`
         );
         const tx = {
           to: returnWallet,
@@ -44,7 +47,7 @@ export const useCleanup = ({
         console.log(`Swept to ${returnWallet} in tx ${txHash}`);
         allTransactions.push(txHash);
       } else {
-        console.log(`Insufficient ETH to sweep`);
+        console.log(`Insufficient ${chain.nativeCurrency.symbol} to sweep`);
       }
     }
 

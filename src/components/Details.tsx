@@ -126,7 +126,7 @@ const Details = ({
           {showWallets && (
             <dd className="text-xs">
               <dl className="space-y-2">
-                <div className="flex items-end">
+                <div className="flex items-start">
                   <dt className="min-w-0 text-xs leading-6 font-medium text-gray-500 whitespace-nowrap">
                     {"Genesis"}
                   </dt>
@@ -141,7 +141,7 @@ const Details = ({
                   </dd>
                 </div>
                 {wallets?.map((w, i) => (
-                  <div className="flex items-center" key={w.address}>
+                  <div className="flex items-start" key={w.address}>
                     <dt className="min-w-0 text-xs leading-6 font-medium text-gray-500 whitespace-nowrap">
                       {`SpeedTest ${i + 1}`}
                     </dt>

@@ -44,80 +44,99 @@ export const useSelfTransactions = ({
       i: number;
       label: string;
     }) => {
-      console.log(`Building transaction ${i + 1} from ${wallet.address}`);
-      const tx = {
-        to: wallet.address,
-        from: wallet.address,
-        value: 0,
-        gasLimit: "21000",
-        maxPriorityFeePerGas: maxFee,
-        maxFeePerGas: gasPrice,
-      };
+      try {
+        console.log(`Building transaction ${i + 1} from ${wallet.address}`);
+        const tx = {
+          to: wallet.address,
+          from: wallet.address,
+          value: 0,
+          gasLimit: "21000",
+          maxPriorityFeePerGas: maxFee,
+          maxFeePerGas: gasPrice,
+        };
 
-      const txRequest = await wallet
-        .connect(initialProvider)
-        .populateTransaction(tx);
-      console.log(txRequest);
-      const signedTx = await wallet.signTransaction(txRequest);
-      console.log(signedTx);
-      const txHash = await provider.send("eth_sendRawTransaction", [signedTx]);
-      console.log(
-        `Transaction ${i + 1} from ${wallet.address}: ${txHash} (${label})`
-      );
+        const txRequest = await wallet
+          .connect(initialProvider)
+          .populateTransaction(tx);
+        console.log(txRequest);
+        const signedTx = await wallet.signTransaction(txRequest);
+        console.log(signedTx);
+        const txHash = await provider.send("eth_sendRawTransaction", [
+          signedTx,
+        ]);
+        console.log(
+          `Transaction ${i + 1} from ${wallet.address}: ${txHash} (${label})`
+        );
 
-      const txReceipt = await initialProvider.waitForTransaction(txHash);
-      const block = await initialProvider.getBlockWithTransactions(
-        txReceipt.blockNumber
-      );
-      const index = block.transactions.findIndex((x) => x.hash === txHash);
+        const txReceipt = await initialProvider.waitForTransaction(txHash);
+        const block = await initialProvider.getBlockWithTransactions(
+          txReceipt.blockNumber
+        );
+        const index = block.transactions.findIndex((x) => x.hash === txHash);
 
-      // fetch block data
-      const zeroMevReq = await fetch(
-        `https://api.zeromev.org/zmblock/${txReceipt.blockNumber}`
-      ).catch((e) => e);
-      const zeroMevJson = (await zeroMevReq.json()) as {
-        pop: [{ name: string; times: { t: number }[] }];
-      };
-      // get the matching block
-      const zeroMevData =
-        zeroMevJson.pop?.filter(
-          (x: { times: { t: number }[] }) =>
-            x.times.length === block.transactions.length
-        ) || [];
+        // fetch block data
+        const zeroMevReq = await fetch(
+          `https://api.zeromev.org/zmblock/${txReceipt.blockNumber}`
+        ).catch((e) => e);
+        const zeroMevJson = (await zeroMevReq.json()) as {
+          pop: [{ name: string; times: { t: number }[] }];
+        };
+        // get the matching block
+        const zeroMevData =
+          zeroMevJson.pop?.filter(
+            (x: { times: { t: number }[] }) =>
+              x.times.length === block.transactions.length
+          ) || [];
 
-      // pull out the first seen dates for different regions
-      const firstSeen = zeroMevData
-        .map((x) => {
-          const ticks = x.times[index]?.t;
+        // pull out the first seen dates for different regions
+        const firstSeen = zeroMevData
+          .map((x) => {
+            const ticks = x.times[index]?.t;
 
-          if (ticks) {
-            return {
-              name: x.name,
-              date: ticksToDate(ticks),
-            };
-          }
-        })
-        .filter(Boolean) as Result["firstSeen"];
+            if (ticks) {
+              return {
+                name: x.name,
+                date: ticksToDate(ticks),
+              };
+            }
+          })
+          .filter(Boolean) as Result["firstSeen"];
 
-      const result = `Transaction ${i + 1} from ${
-        wallet.address
-      } was included in block ${txReceipt.blockNumber} with order ${
-        index + 1
-      } (${label})`;
+        const result = `Transaction ${i + 1} from ${
+          wallet.address
+        } was included in block ${txReceipt.blockNumber} with order ${
+          index + 1
+        } (${label})`;
 
-      console.log(result);
+        onResult({
+          iteration: i + 1,
+          wallet: wallet.address,
+          tx: txHash,
+          blockNumber: txReceipt.blockNumber,
+          order: index + 1,
+          label,
+          firstSeen,
+        });
 
-      onResult({
-        iteration: i + 1,
-        wallet: wallet.address,
-        tx: txHash,
-        blockNumber: txReceipt.blockNumber,
-        order: index + 1,
-        label,
-        firstSeen,
-      });
+        return result;
+      } catch (e) {
+        console.log(e);
+        const result = `Transaction ${i + 1} from ${
+          wallet.address
+        } threw an error (${label})`;
 
-      return result;
+        onResult({
+          iteration: i + 1,
+          wallet: wallet.address,
+          tx: "RPC Error",
+          blockNumber: 0,
+          order: Infinity,
+          label,
+          firstSeen: [],
+        });
+
+        return result;
+      }
     },
     [initialProvider]
   );
@@ -178,6 +197,7 @@ export const useSelfTransactions = ({
 
   return {
     results,
+    setResults,
     startSelfTransactions,
   };
 };
