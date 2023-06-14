@@ -21,7 +21,7 @@ const { chains, provider, webSocketProvider } = configureChains(
         };
       },
     }),
-    // publicProvider(),
+    publicProvider(),
   ]
 );
 
