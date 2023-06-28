@@ -1,6 +1,6 @@
 // Take the RPC data and calculate the podium finishes of each
 
-import { Result } from "../types";
+import { Result } from '../types';
 
 // loop by comparing blockNumber and order across all
 export const formatRpcRankings = (results: Result[]) => {

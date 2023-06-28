@@ -1,30 +1,12 @@
-import { BigNumber, Wallet, ethers } from "ethers";
-import { parseUnits } from "ethers/lib/utils.js";
-import { useEffect, useState } from "react";
+import { parseUnits } from 'viem';
+import { useFeeData as useFeeDataWagmi } from 'wagmi';
 
-const useFeeData = ({
-  initialWallet,
-  blockNumber,
-}: {
-  initialWallet: Wallet;
-  blockNumber?: number;
-}) => {
-  const [feeData, setFeeData] = useState<ethers.providers.FeeData>();
+const useFeeData = () => {
+  const { data } = useFeeDataWagmi({ watch: true });
 
-  useEffect(() => {
-    (async () => {
-      if (initialWallet && blockNumber) {
-        const x = await initialWallet.getFeeData();
-        setFeeData(x);
-      }
-    })();
-  }, [initialWallet, blockNumber]);
+  const maxPriorityFeePerGas = data?.maxPriorityFeePerGas || parseUnits('1', 9);
 
-  const maxPriorityFeePerGas =
-    feeData?.maxPriorityFeePerGas || parseUnits("1", "gwei");
-
-  const gasPrice =
-    feeData?.lastBaseFeePerGas?.add(maxPriorityFeePerGas) || BigNumber.from(0);
+  const gasPrice = (data?.lastBaseFeePerGas || 0n) + maxPriorityFeePerGas || 0n;
 
   return {
     maxPriorityFeePerGas,

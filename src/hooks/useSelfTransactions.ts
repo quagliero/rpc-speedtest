@@ -1,10 +1,24 @@
-import { BigNumber, Wallet, ethers } from "ethers";
-import { formatEther, parseUnits } from "ethers/lib/utils.js";
-import { useCallback, useState } from "react";
-import { Result } from "../types";
+import { useCallback, useState } from 'react';
+import { PrivateKeyAccountWithKey, Result } from '../types';
+import {
+  CustomTransport,
+  PrivateKeyAccount,
+  PublicClient,
+  Transaction,
+  WalletClient,
+  createPublicClient,
+  createWalletClient,
+  custom,
+  formatEther,
+  http,
+  parseUnits,
+  prepareRequest,
+} from 'viem';
+import type { Chain } from 'wagmi';
+import { waitForTransaction } from '@wagmi/core';
 
 const ticksToDate = (ticks: number) => {
-  const epochTicks = BigInt("621355968000000000");
+  const epochTicks = BigInt('621355968000000000');
   const unixMilliseconds = BigInt((BigInt(ticks) - epochTicks) / BigInt(10000));
   const date = new Date(Number(unixMilliseconds));
 
@@ -15,11 +29,13 @@ export const useSelfTransactions = ({
   initialProvider,
   initialWallet,
   rpcUrls,
+  chain,
   loops,
   delay = 13,
 }: {
-  initialProvider: ethers.providers.JsonRpcProvider;
-  initialWallet: Wallet;
+  initialProvider: PublicClient;
+  initialWallet: WalletClient<CustomTransport, Chain, PrivateKeyAccount>;
+  chain: Chain;
   rpcUrls: string[];
   loops: number;
   delay: number;
@@ -29,50 +45,75 @@ export const useSelfTransactions = ({
   const sendSelfTransactions = useCallback(
     async ({
       wallet,
-      gasPrice,
-      maxFee,
       provider,
       onResult,
+      chain,
       i,
       label,
     }: {
-      wallet: Wallet;
-      gasPrice?: BigNumber;
-      maxFee: BigNumber;
-      provider: ethers.providers.JsonRpcProvider;
+      wallet: WalletClient<CustomTransport, Chain, PrivateKeyAccountWithKey>;
+      provider: PublicClient;
+      chain: Chain;
       onResult: (args: Result) => void;
       i: number;
       label: string;
     }) => {
       try {
-        console.log(`Building transaction ${i + 1} from ${wallet.address}`);
-        const tx = {
-          to: wallet.address,
-          from: wallet.address,
-          value: 0,
-          gasLimit: "21000",
-          maxPriorityFeePerGas: maxFee,
-          maxFeePerGas: gasPrice,
+        console.log(
+          `Building transaction ${i + 1} from ${wallet.account?.address}`
+        );
+
+        const txRequest = {
+          chainId: chain.id,
+          gas: 21000n,
+          to: wallet.account?.address,
+          value: 0n,
         };
 
-        const txRequest = await wallet
-          .connect(initialProvider)
-          .populateTransaction(tx);
-        console.log(txRequest);
-        const signedTx = await wallet.signTransaction(txRequest);
+        const walletClient = createWalletClient({
+          name: `SpeedTest Wallet Client ${i}`,
+          account: wallet.account,
+          chain,
+          transport: custom(provider),
+        });
+
+        const signedTx = await walletClient.account.signTransaction(txRequest);
         console.log(signedTx);
-        const txHash = await provider.send("eth_sendRawTransaction", [
-          signedTx,
-        ]);
+        // @TODO https://github.com/wagmi-dev/viem/discussions/785
+        // const txHash = await provider.send("eth_sendRawTransaction", [
+        //   signedTx,
+        // ]);
+        const txHash = await walletClient.sendTransaction(txRequest);
         console.log(
-          `Transaction ${i + 1} from ${wallet.address}: ${txHash} (${label})`
+          `Transaction ${i + 1} from ${
+            wallet.account.address
+          }: ${txHash} (${label})`
         );
 
-        const txReceipt = await initialProvider.waitForTransaction(txHash);
-        const block = await initialProvider.getBlockWithTransactions(
-          txReceipt.blockNumber
+        const txReceipt = await waitForTransaction({
+          hash: txHash,
+          chainId: chain.id,
+          timeout: 2000,
+        }).catch(async (e) => {
+          console.log(e);
+          return {
+            blockNumber: 0n,
+          };
+        });
+
+        const block = await initialProvider
+          .getBlock({
+            blockNumber: txReceipt.blockNumber,
+            includeTransactions: true,
+          })
+          .catch((e) => {
+            console.log(e);
+            return { transactions: [] };
+          });
+
+        const index = block.transactions.findIndex(
+          (x) => x === txHash || (x as Transaction).hash === txHash
         );
-        const index = block.transactions.findIndex((x) => x.hash === txHash);
 
         // fetch block data
         const zeroMevReq = await fetch(
@@ -100,19 +141,19 @@ export const useSelfTransactions = ({
               };
             }
           })
-          .filter(Boolean) as Result["firstSeen"];
+          .filter(Boolean) as Result['firstSeen'];
 
         const result = `Transaction ${i + 1} from ${
-          wallet.address
+          wallet.account.address
         } was included in block ${txReceipt.blockNumber} with order ${
           index + 1
         } (${label})`;
 
         onResult({
           iteration: i + 1,
-          wallet: wallet.address,
+          wallet: wallet.account.address,
           tx: txHash,
-          blockNumber: txReceipt.blockNumber,
+          blockNumber: Number(txReceipt.blockNumber),
           order: index + 1,
           label,
           firstSeen,
@@ -122,13 +163,13 @@ export const useSelfTransactions = ({
       } catch (e) {
         console.log(e);
         const result = `Transaction ${i + 1} from ${
-          wallet.address
+          wallet.account.address
         } threw an error (${label})`;
 
         onResult({
           iteration: i + 1,
-          wallet: wallet.address,
-          tx: "RPC Error",
+          wallet: wallet.account.address,
+          tx: 'RPC Error',
           blockNumber: 0,
           order: Infinity,
           label,
@@ -142,34 +183,30 @@ export const useSelfTransactions = ({
   );
 
   const startSelfTransactions = useCallback(
-    async (wallets: Wallet[]) => {
+    async (wallets: PrivateKeyAccountWithKey[]) => {
       const onResult = (result: Result) => {
         setResults((prevResults) => [...prevResults, result]);
       };
 
-      console.log("Beginning transactions");
+      console.log('Beginning transactions');
 
       for (let i = 0; i < loops; i++) {
         const promises = [];
-        const { lastBaseFeePerGas, maxPriorityFeePerGas } =
-          await initialWallet.getFeeData();
-        const maxFee = maxPriorityFeePerGas || parseUnits("1", "gwei");
-        const gasPrice = lastBaseFeePerGas?.add(maxFee) || undefined;
-
-        console.log("Iteration ", i + 1);
-        console.log("Gas", {
-          maxFeePerGas: gasPrice ? formatEther(gasPrice) : null,
-          maxPriorityFeePerGas: formatEther(maxFee),
-        });
+        console.log('Iteration ', i + 1);
 
         for (let j = 0; j < rpcUrls.length; j++) {
-          const provider = new ethers.providers.JsonRpcProvider(rpcUrls[j]);
           promises.push(
             sendSelfTransactions({
-              wallet: wallets[j].connect(initialProvider),
-              gasPrice,
-              maxFee,
-              provider,
+              chain,
+              wallet: createWalletClient({
+                account: wallets[j],
+                chain,
+                transport: custom(initialProvider),
+              }),
+              provider: createPublicClient({
+                chain,
+                transport: http(rpcUrls[j]),
+              }),
               onResult,
               i,
               label: rpcUrls[j],
@@ -185,14 +222,7 @@ export const useSelfTransactions = ({
         }
       }
     },
-    [
-      rpcUrls,
-      loops,
-      delay,
-      sendSelfTransactions,
-      initialProvider,
-      initialWallet,
-    ]
+    [rpcUrls, loops, delay, sendSelfTransactions, initialProvider, chain]
   );
 
   return {

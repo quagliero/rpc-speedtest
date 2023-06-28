@@ -1,6 +1,6 @@
-import { Chain } from "wagmi";
-import { ellipsis } from "../utils/ellipsis";
-import { Result } from "../types";
+import { Chain } from 'wagmi';
+import { ellipsis } from '../utils/ellipsis';
+import { Result } from '../types';
 
 const resultSortFn = (a: Result, b: Result) => {
   if (a.iteration !== b.iteration) {
@@ -29,7 +29,7 @@ const ResultsTable = ({
 
   return (
     <div className="w-full">
-      <h2 className="font-bold text-lg mb-2">{"SpeedTest Results"}</h2>
+      <h2 className="font-bold text-lg mb-2">{'SpeedTest Results'}</h2>
       <table className="min-w-full divide-y divide-gray-300 bg-white text-gray-800 rounded-lg overflow-hidden">
         <thead>
           <tr>
@@ -37,25 +37,25 @@ const ResultsTable = ({
               scope="col"
               className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900"
             >
-              {"Iteration"}
+              {'Iteration'}
             </th>
             <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              {"Transaction"}
+              {'Transaction'}
             </th>
             <th className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-              {"Block"}
+              {'Block'}
             </th>
             <th className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
-              {"Order"}
+              {'Order'}
             </th>
             <th className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900 whitespace-nowrap">
-              {"First seen"}
+              {'First seen'}
             </th>
             <th
               scope="col"
               className="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900"
             >
-              {"RPC"}
+              {'RPC'}
             </th>
           </tr>
         </thead>
@@ -65,7 +65,7 @@ const ResultsTable = ({
               <tr
                 key={result.tx}
                 className={
-                  result.iteration % 2 === 0 ? "bg-gray-100" : "bg-white"
+                  result.iteration % 2 === 0 ? 'bg-gray-100' : 'bg-white'
                 }
               >
                 <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">

@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from 'react';
 
 const RPCs = ({
   urls,
@@ -39,7 +39,7 @@ const RPCs = ({
     <>
       <fieldset>
         <legend className="text-base font-semibold leading-6 text-gray-900">
-          {"Selected RPCs"}
+          {'Selected RPCs'}
         </legend>
         <div className="mt-4 divide-y divide-gray-200 border-b border-t border-gray-200">
           {rpcUrls.map((rpc, i) => (
@@ -47,7 +47,7 @@ const RPCs = ({
               htmlFor={`rpc-${rpc.url}`}
               key={i}
               className={`relative flex items-center p-2 cursor-pointer hover:bg-indigo-50/50 ${
-                !selectedUrls.includes(rpc.url) ? "opacity-75" : ""
+                !selectedUrls.includes(rpc.url) ? 'opacity-75' : ''
               }`}
             >
               <div className="min-w-0 flex-1 text-sm leading-6">
@@ -93,11 +93,11 @@ const RPCs = ({
         <div className="py-2 text-right">
           <button
             onClick={() =>
-              setRpcUrls((x) => [...x, { editable: true, url: "" }])
+              setRpcUrls((x) => [...x, { editable: true, url: '' }])
             }
             className="rounded-full border-indigo-600 border-2 px-2 py-1.5 text-xs font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           >
-            {"+ Custom RPC"}
+            {'+ Custom RPC'}
           </button>
         </div>
       </fieldset>

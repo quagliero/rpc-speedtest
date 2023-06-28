@@ -1,5 +1,5 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import Speedtest from "../components/Speedtest";
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import Speedtest from '../components/Speedtest';
 
 function Page() {
   return (
@@ -11,7 +11,7 @@ function Page() {
         >
           <div className="flex lg:flex-1">
             <a href="#" className="-m-1.5 p-1.5 flex items-center">
-              <span className="text-2xl mr-2">{"🚀"}</span>
+              <span className="text-2xl mr-2">{'🚀'}</span>
               <span className="font-bold text-xl text-indigo-600">
                 RPC SpeedTest
               </span>

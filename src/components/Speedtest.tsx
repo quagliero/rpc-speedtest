@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
-import { mainnet, useNetwork } from "wagmi";
-import ResultsTable from "./ResultsTable";
-import RPCs from "./RPCs";
-import Details from "./Details";
-import { RPC_URLS } from "../core/rpcs";
-import useSpeedTest from "../hooks/useSpeedTest";
-import Spinner from "./Spinner";
-import { formatNumber } from "../utils/formatNumber";
-import { formatEther } from "ethers/lib/utils.js";
-import RankingsTable from "./RankingsTable";
-import { scrollToBottom } from "../utils/scrollToBottom";
+import React, { useEffect, useState } from 'react';
+import { mainnet, useNetwork } from 'wagmi';
+import ResultsTable from './ResultsTable';
+import RPCs from './RPCs';
+import Details from './Details';
+import { RPC_URLS } from '../core/rpcs';
+import useSpeedTest from '../hooks/useSpeedTest';
+import Spinner from './Spinner';
+import { formatNumber } from '../utils/formatNumber';
+import RankingsTable from './RankingsTable';
+import { scrollToBottom } from '../utils/scrollToBottom';
+import { formatEther } from 'viem';
 
 function getCurrentIteration(
   loopCount: number,
@@ -82,7 +82,7 @@ const Speedtest: React.FC = () => {
       </div>
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white flex-1 flex flex-col px-6 py-10">
         <div className="container mx-auto max-w-7xl flex-1 flex">
-          {status === "idle" && (
+          {status === 'idle' && (
             <div className="w-full flex-col flex items-center justify-center">
               <button
                 className="rounded-full bg-white px-4 py-2.5 text-2xl font-semibold text-indigo-600 shadow-sm hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-75"
@@ -90,7 +90,7 @@ const Speedtest: React.FC = () => {
                 onClick={() => sendTransaction?.()}
                 disabled={!initialWallet || !rpcUrls.length}
               >
-                {"Start Speed Test"}
+                {'Start Speed Test'}
               </button>
               <h1 className="mt-6 text-indigo-300 max-w-prose text-center">
                 {`Beginning the test will transfer ${formatNumber(
@@ -104,11 +104,11 @@ const Speedtest: React.FC = () => {
               </h1>
             </div>
           )}
-          {(status === "seeding" || status === "starting") && (
+          {(status === 'seeding' || status === 'starting') && (
             <p className="w-full flex items-center justify-center text-xl">
               <span className="mr-4">
-                {status === "starting"
-                  ? "Funding Genesis Wallet"
+                {status === 'starting'
+                  ? 'Funding Genesis Wallet'
                   : `Funding SpeedTest wallet ${Math.min(
                       wallets.length + 1,
                       rpcUrls.length
@@ -117,14 +117,14 @@ const Speedtest: React.FC = () => {
               <Spinner />
             </p>
           )}
-          {(status === "running" ||
-            status === "success" ||
-            status === "cleaning") && (
+          {(status === 'running' ||
+            status === 'success' ||
+            status === 'cleaning') && (
             <div className="mb-6 flex-1 space-y-6">
               <ResultsTable chain={chain} results={results} />
               <RankingsTable results={results} />
               <p className="w-full flex items-center justify-center text-xl">
-                {status === "running" && (
+                {status === 'running' && (
                   <>
                     <span className="mr-4">
                       {`Running SpeedTest loop ${getCurrentIteration(
@@ -136,19 +136,19 @@ const Speedtest: React.FC = () => {
                     <Spinner />
                   </>
                 )}
-                {status === "cleaning" && (
+                {status === 'cleaning' && (
                   <>
-                    <span className="mr-4">{"Running wallet cleanup"}</span>
+                    <span className="mr-4">{'Running wallet cleanup'}</span>
                     <Spinner />
                   </>
                 )}
-                {status === "success" && (
+                {status === 'success' && (
                   <span className="flex items-center space-x-4">
                     <button
                       onClick={() => reset()}
                       className="flex-none text-sm font-medium ml-2 bg-white rounded-full px-3 py-1 text-indigo-600 hover:bg-indigo-100"
                     >
-                      {"Clear Results"}
+                      {'Clear Results'}
                     </button>
                     <button
                       onClick={() => {
@@ -157,7 +157,7 @@ const Speedtest: React.FC = () => {
                       }}
                       className="flex-none text-sm font-medium ml-2 bg-white rounded-full px-3 py-1 text-indigo-600 hover:bg-indigo-100"
                     >
-                      {"Run Again"}
+                      {'Run Again'}
                     </button>
                   </span>
                 )}
